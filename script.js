@@ -10,13 +10,7 @@ const DEFAULT_NORMAL_POOL = {
   7: ["WAKACJE", "PIEROGI", "KWIATKI", "ZEGARKI", "SZYBKIE", "OGRÓDKI", "ULICZKA", "KSIĄŻKI", "PODRÓŻE", "WARZYWA", "GÓRSKIE", "KOTLETY", "RADOSNY", "POLSKIE", "JABŁONIE", "MIASTKO", "DODATKI"]
 };
 
-const KEYBOARD_MAIN_ROWS = [
-  ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
-  ["A", "S", "D", "F", "G", "H", "J", "K", "L", "BACKSPACE"],
-  ["Z", "X", "C", "V", "B", "N", "M", "ENTER"]
-];
-const KEYBOARD_PL_ROW = ["Ą", "Ć", "Ę", "Ł", "Ń", "Ó", "Ś", "Ź", "Ż"];
-
+// Selektory DOM
 const boardElement = document.getElementById("board");
 const statusElement = document.getElementById("status");
 const selectLengthElement = document.getElementById("word-length");
@@ -29,7 +23,16 @@ const definitionElement = document.getElementById("definition");
 const definitionWordElement = document.getElementById("definition-word");
 const definitionTextElement = document.getElementById("definition-text");
 
-// Ładowanie danych z plików zewnętrznych
+const KEYBOARD_MAIN_ROWS = [
+  ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+  ["A", "S", "D", "F", "G", "H", "J", "K", "L", "BACKSPACE"],
+  ["Z", "X", "C", "V", "B", "N", "M", "ENTER"]
+];
+const KEYBOARD_PL_ROW = ["Ą", "Ć", "Ę", "Ł", "Ń", "Ó", "Ś", "Ź", "Ż"];
+
+let gameState = {};
+let currentMode = GAME_MODES.NORMAL;
+
 function normalizeWordPool(pool) {
   const normalized = { 4: [], 5: [], 6: [], 7: [] };
   for (const [len, words] of Object.entries(pool || {})) {
@@ -39,11 +42,10 @@ function normalizeWordPool(pool) {
 }
 
 const NORMAL_WORD_POOL = normalizeWordPool(window.NORMAL_WORD_POOL || DEFAULT_NORMAL_POOL);
-const FOREIGN_DATA = window.FOREIGN_DICTIONARY_DATA || { wordsByLength: {}, definitionsByWord: {} };
-const FOREIGN_WORD_POOL = normalizeWordPool(FOREIGN_DATA.wordsByLength);
-const FOREIGN_DEFINITION_MAP = new Map(Object.entries(FOREIGN_DATA.definitionsByWord || {}));
 
-let gameState = {};
+function getForeignData() {
+  return window.FOREIGN_DICTIONARY_DATA || { wordsByLength: {}, definitionsByWord: {} };
+}
 
 function init() {
   buildKeyboard();
@@ -53,8 +55,14 @@ function init() {
 
 function startNewRound() {
   const len = parseInt(selectLengthElement.value);
-  const pool = currentMode === GAME_MODES.NORMAL ? NORMAL_WORD_POOL[len] : FOREIGN_WORD_POOL[len];
-  const target = pool[Math.floor(Math.random() * pool.length)] || "TEST";
+  const foreignData = getForeignData();
+  const pool = currentMode === GAME_MODES.NORMAL 
+    ? NORMAL_WORD_POOL[len] 
+    : normalizeWordPool(foreignData.wordsByLength)[len];
+  
+  const target = (pool && pool.length > 0) 
+    ? pool[Math.floor(Math.random() * pool.length)] 
+    : "TEST";
   
   gameState = {
     wordLength: len,
@@ -72,24 +80,34 @@ function startNewRound() {
   setStatus("Powodzenia!", false);
 }
 
-// UPROSZCZONA WALIDACJA - BEZ PYTHONA
 async function validateGuess(word) {
-  // Teraz gra zawsze przyjmie słowo, jeśli ma dobrą długość
   return { accepted: true }; 
 }
-// --- RESZTA FUNKCJI (Skrócona dla czytelności, ale zachowująca logikę) ---
 
 function renderBoard() {
   boardElement.innerHTML = "";
   boardElement.style.setProperty("--word-len", gameState.wordLength);
+  
   for (let r = 0; r < MAX_ATTEMPTS; r++) {
     const rowDiv = document.createElement("div");
     rowDiv.className = "row";
+    
     for (let c = 0; c < gameState.wordLength; c++) {
       const tile = document.createElement("div");
       tile.className = "tile";
+      
+      // MOŻLIWOŚĆ KLIKNIĘCIA W DOWOLNE MIEJSCE
+      tile.onclick = () => {
+        if (!gameState.gameOver && r === gameState.rowIndex) {
+          gameState.activeCol = c;
+          renderBoard();
+        }
+      };
+
       if (gameState.evaluations[r]) tile.classList.add(gameState.evaluations[r][c]);
-      if (r === gameState.rowIndex && c === gameState.activeCol && !gameState.gameOver) tile.classList.add("caret");
+      if (r === gameState.rowIndex && c === gameState.activeCol && !gameState.gameOver) {
+        tile.classList.add("caret");
+      }
       tile.textContent = gameState.board[r][c];
       rowDiv.appendChild(tile);
     }
@@ -101,16 +119,21 @@ function renderBoard() {
 function handleKeyInput(key) {
   if (gameState.gameOver) return;
   const row = gameState.board[gameState.rowIndex];
+
   if (key === "ENTER") {
     submitRow();
   } else if (key === "BACKSPACE") {
-    if (gameState.activeCol > 0 || row[gameState.activeCol] !== "") {
-        if (row[gameState.activeCol] === "" && gameState.activeCol > 0) gameState.activeCol--;
-        row[gameState.activeCol] = "";
+    if (row[gameState.activeCol] !== "") {
+      row[gameState.activeCol] = "";
+    } else if (gameState.activeCol > 0) {
+      gameState.activeCol--;
+      row[gameState.activeCol] = "";
     }
-  } else if (LETTER_REGEX.test(key) && gameState.activeCol < gameState.wordLength) {
+  } else if (LETTER_REGEX.test(key)) {
     row[gameState.activeCol] = key;
-    if (gameState.activeCol < gameState.wordLength - 1) gameState.activeCol++;
+    if (gameState.activeCol < gameState.wordLength - 1) {
+      gameState.activeCol++;
+    }
   }
   renderBoard();
 }
@@ -126,7 +149,6 @@ async function submitRow() {
   const result = evaluate(guess, gameState.targetWord);
   gameState.evaluations[gameState.rowIndex] = result;
   
-  // Aktualizacja klawiatury
   guess.split("").forEach((l, i) => {
     const old = gameState.keyboardState.get(l);
     if (result[i] === "correct" || (result[i] === "present" && old !== "correct")) {
@@ -161,15 +183,15 @@ function evaluate(guess, target) {
 }
 
 function buildKeyboard() {
+  const keyboardButtonByKey = new Map();
   const mk = (k) => {
     const b = document.createElement("button");
     b.className = "key" + (k.length > 1 ? " special" : "");
     b.textContent = k === "BACKSPACE" ? "⌫" : k;
     b.onclick = () => handleKeyInput(k);
-    keyboardButtonByKey.set(k, b);
     return b;
   };
-  const keyboardButtonByKey = new Map();
+
   [...KEYBOARD_MAIN_ROWS, KEYBOARD_PL_ROW].forEach((row, i) => {
     const d = document.createElement("div");
     d.className = "key-row";
@@ -180,50 +202,76 @@ function buildKeyboard() {
 
 function paintKeyboard() {
     document.querySelectorAll(".key").forEach(b => {
-        const state = gameState.keyboardState.get(b.textContent === "⌫" ? "BACKSPACE" : b.textContent);
-        if (state) { b.classList.remove("correct", "present", "absent"); b.classList.add(state); }
+        const keyLabel = b.textContent === "⌫" ? "BACKSPACE" : b.textContent;
+        const state = gameState.keyboardState.get(keyLabel);
+        if (state) { 
+          b.classList.remove("correct", "present", "absent"); 
+          b.classList.add(state); 
+        }
     });
 }
 
-function setStatus(t, err) { statusElement.textContent = t; statusElement.className = "status " + (err ? "error" : ""); }
-function hideDefinition() { definitionElement.hidden = true; }
+function setStatus(t, err) { 
+  statusElement.textContent = t; 
+  statusElement.className = "status " + (err ? "error" : ""); 
+}
+
+function hideDefinition() { 
+  definitionElement.hidden = true; 
+  definitionElement.style.display = "none";
+}
+
 function showDefinition() {
     if (currentMode === GAME_MODES.FOREIGN) {
-        // 1. Pobieramy dane ze słownika (sprawdzamy różne możliwe nazwy)
-        const dictionary = window.FOREIGN_DICTIONARY_DATA || {};
-        const defs = dictionary.definitionsByWord || dictionary.definitions || dictionary.definitionByWord || {};
+        const dictionary = getForeignData();
+        const defs = dictionary.definitionsByWord || dictionary.definitions || {};
         
-        // 2. Szukamy definicji dla wylosowanego słowa
         let definition = defs[gameState.targetWord];
 
-        // 3. Jeśli nie znaleziono (np. małe/duże litery), szukamy bez względu na wielkość liter
         if (!definition) {
             const entry = Object.entries(defs).find(([key]) => key.toUpperCase() === gameState.targetWord.toUpperCase());
             if (entry) definition = entry[1];
         }
 
-        // 4. Wyświetlamy na ekranie
         definitionWordElement.textContent = gameState.targetWord;
-        definitionTextElement.textContent = definition || "Brak definicji w bazie danych dla tego słowa.";
+        definitionTextElement.textContent = definition || "Brak definicji dla tego słowa.";
         definitionElement.hidden = false;
-        
-        // Na wypadek gdyby element był zablokowany w CSS
         definitionElement.style.display = "block";
     }
 }
-let currentMode = GAME_MODES.NORMAL;
+
 function bindUiEvents() {
     newRoundButton.onclick = startNewRound;
     selectLengthElement.onchange = startNewRound;
-    normalModeButton.onclick = () => { currentMode = GAME_MODES.NORMAL; normalModeButton.classList.add("active"); foreignModeButton.classList.remove("active"); startNewRound(); };
-    foreignModeButton.onclick = () => { currentMode = GAME_MODES.FOREIGN; foreignModeButton.classList.add("active"); normalModeButton.classList.remove("active"); startNewRound(); };
+    
+    normalModeButton.onclick = () => { 
+      currentMode = GAME_MODES.NORMAL; 
+      normalModeButton.classList.add("active"); 
+      foreignModeButton.classList.remove("active"); 
+      startNewRound(); 
+    };
+    
+    foreignModeButton.onclick = () => { 
+      currentMode = GAME_MODES.FOREIGN; 
+      foreignModeButton.classList.add("active"); 
+      normalModeButton.classList.remove("active"); 
+      startNewRound(); 
+    };
+
     document.onkeydown = (e) => {
         if (e.key === "Enter") handleKeyInput("ENTER");
         else if (e.key === "Backspace") handleKeyInput("BACKSPACE");
+        else if (e.key === "ArrowLeft") {
+            if (gameState.activeCol > 0) { gameState.activeCol--; renderBoard(); }
+        }
+        else if (e.key === "ArrowRight") {
+            if (gameState.activeCol < gameState.wordLength - 1) { gameState.activeCol++; renderBoard(); }
+        }
         else {
             const l = e.key.toUpperCase();
             if (LETTER_REGEX.test(l)) handleKeyInput(l);
         }
     };
 }
+
 init();
