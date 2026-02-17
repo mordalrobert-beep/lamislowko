@@ -189,9 +189,26 @@ function setStatus(t, err) { statusElement.textContent = t; statusElement.classN
 function hideDefinition() { definitionElement.hidden = true; }
 function showDefinition() {
     if (currentMode === GAME_MODES.FOREIGN) {
+        // 1. Pobieramy dane ze słownika (sprawdzamy różne możliwe nazwy)
+        const dictionary = window.FOREIGN_DICTIONARY_DATA || {};
+        const defs = dictionary.definitionsByWord || dictionary.definitions || dictionary.definitionByWord || {};
+        
+        // 2. Szukamy definicji dla wylosowanego słowa
+        let definition = defs[gameState.targetWord];
+
+        // 3. Jeśli nie znaleziono (np. małe/duże litery), szukamy bez względu na wielkość liter
+        if (!definition) {
+            const entry = Object.entries(defs).find(([key]) => key.toUpperCase() === gameState.targetWord.toUpperCase());
+            if (entry) definition = entry[1];
+        }
+
+        // 4. Wyświetlamy na ekranie
         definitionWordElement.textContent = gameState.targetWord;
-        definitionTextElement.textContent = FOREIGN_DEFINITION_MAP.get(gameState.targetWord) || "Brak definicji.";
+        definitionTextElement.textContent = definition || "Brak definicji w bazie danych dla tego słowa.";
         definitionElement.hidden = false;
+        
+        // Na wypadek gdyby element był zablokowany w CSS
+        definitionElement.style.display = "block";
     }
 }
 let currentMode = GAME_MODES.NORMAL;
