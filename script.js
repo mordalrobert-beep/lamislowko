@@ -74,15 +74,9 @@ function startNewRound() {
 
 // UPROSZCZONA WALIDACJA - BEZ PYTHONA
 async function validateGuess(word) {
-  const len = word.length;
-  const pool = currentMode === GAME_MODES.NORMAL ? NORMAL_WORD_POOL[len] : FOREIGN_WORD_POOL[len];
-  
-  if (pool.includes(word)) {
-    return { accepted: true };
-  }
-  return { accepted: false, message: "Tego słowa nie ma na liście gry." };
+  // Teraz gra zawsze przyjmie słowo, jeśli ma dobrą długość
+  return { accepted: true }; 
 }
-
 // --- RESZTA FUNKCJI (Skrócona dla czytelności, ale zachowująca logikę) ---
 
 function renderBoard() {
