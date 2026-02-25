@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Łamisłówko</title>
+  <link rel="icon" href="kurczaczek.ico" sizes="any">
+  <link rel="shortcut icon" href="kurczaczek.ico" type="image/x-icon">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <h1>Łamisłówko</h1>
+      <div class="controls">
+        <div class="mode-switch" role="group" aria-label="Tryb gry">
+          <button id="mode-normal" class="mode-btn active" data-mode="normal" type="button">Polskie słowa</button>
+          <button id="mode-foreign" class="mode-btn" data-mode="foreign" type="button">Wyrazy obce</button>
+        </div>
+        <label for="word-length">Długość hasła:</label>
+        <select id="word-length">
+          <option value="4">4 litery</option>
+          <option value="5" selected>5 liter</option>
+          <option value="6">6 liter</option>
+          <option value="7">7 liter</option>
+        </select>
+        <button id="new-round" type="button">Nowa runda</button>
+      </div>
+    </header>
+
+    <section id="status" class="status" aria-live="polite"></section>
+    <section id="board" class="board" aria-label="Plansza gry"></section>
+    <section id="definition" class="definition" hidden>
+      <div class="definition-title">Definicja:</div>
+      <div id="definition-word" class="definition-word"></div>
+      <div id="definition-text" class="definition-text"></div>
+      <div class="definition-source">Źródło: słownik wyrazów obcych (lokalny)</div>
+    </section>
+
+    <section class="keyboard-wrap" aria-label="Klawiatura ekranowa">
+      <div id="keyboard-main" class="keyboard"></div>
+      <div id="keyboard-pl" class="keyboard pl-row"></div>
+    </section>
+  </main>
+
+  <script src="normal_words.js"></script>
+  <script src="foreign-dictionary-data.js"></script>
+  <script src="dictionary/pl_PL.words.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
